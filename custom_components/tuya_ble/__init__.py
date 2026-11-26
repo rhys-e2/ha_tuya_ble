@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from bleak.backends.device import BLEDevice
@@ -29,6 +30,7 @@ from .const import (
     CONF_STATUS_RANGE,
     CONF_UUID,
     DOMAIN,
+    INITIAL_UPDATE_STAGGER_SECONDS,
 )
 from .device_registry import async_setup_registry
 from .devices import TuyaBLECoordinator, TuyaBLEData, get_device_product_info
@@ -41,6 +43,24 @@ from .tuya_ble import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# hass.data key holding the loop time at which the next initial update may start.
+# Kept outside hass.data[DOMAIN], which is keyed by config entry id.
+_STAGGER_KEY = f"{DOMAIN}_initial_update_next_slot"
+
+
+def _claim_initial_update_delay(hass: HomeAssistant) -> float:
+    """Reserve the next startup slot and return how long to wait for it.
+
+    Slots are INITIAL_UPDATE_STAGGER_SECONDS apart. The first entry gets no delay;
+    each later entry set up in the same burst waits one more interval. Once the
+    burst is over the next slot is in the past, so a lone reload is not delayed.
+    """
+    now = hass.loop.time()
+    slot = max(now, hass.data.get(_STAGGER_KEY, now))
+    hass.data[_STAGGER_KEY] = slot + INITIAL_UPDATE_STAGGER_SECONDS
+    return slot - now
+
 
 PLATFORMS: list[Platform] = [
     Platform.BUTTON,
@@ -195,8 +215,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     coordinator = TuyaBLECoordinator(hass, device)
 
+    # Claimed now, synchronously, so slots follow setup order.
+    initial_update_delay = _claim_initial_update_delay(hass)
+
     async def _async_initial_update() -> None:
         """Request the initial device status without blocking setup."""
+        if initial_update_delay > 0:
+            _LOGGER.debug(
+                "%s: Staggering initial update by %.1fs", address, initial_update_delay
+            )
+            await asyncio.sleep(initial_update_delay)
         try:
             await device.update()
         except BLE_CONNECTION_EXCEPTIONS:
