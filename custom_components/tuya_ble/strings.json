@@ -351,6 +351,19 @@
       "login_error": "Login error ({code}): {msg}"
     },
     "step": {
+      "init": {
+        "menu_options": {
+          "user": "Re-authenticate",
+          "startup": "Startup settings"
+        }
+      },
+      "startup": {
+        "title": "Startup settings",
+        "description": "When Home Assistant starts, devices are contacted one after another to avoid opening many Bluetooth connections at once. After this device starts, the next device waits this long. Set to 0 to disable staggering for this device.",
+        "data": {
+          "initial_update_stagger": "Delay before the next device starts (seconds)"
+        }
+      },
       "user": {
         "data": {
           "user_code": "User Code"
