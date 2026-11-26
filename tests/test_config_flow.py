@@ -26,11 +26,13 @@ from custom_components.tuya_ble.const import (
     CONF_CLOUD_INFO,
     CONF_CLOUD_UUID,
     CONF_DEVICE_NAME,
+    CONF_INITIAL_UPDATE_STAGGER,
     CONF_LOCAL_SCHEMA,
     CONF_PRODUCT_ID,
     CONF_PRODUCT_NAME,
     CONF_USER_CODE,
     CONF_UUID,
+    DEFAULT_INITIAL_UPDATE_STAGGER,
     DOMAIN,
 )
 from custom_components.tuya_ble.tuya_ble import SERVICE_UUID, TuyaBLEDeviceCredentials
@@ -749,11 +751,36 @@ async def test_async_get_options_flow(hass: HomeAssistant) -> None:
 
 
 async def test_options_init(hass: HomeAssistant) -> None:
-    """Test the options flow init step."""
+    """Test the options flow init step offers a menu."""
     flow, _ = build_options_flow(hass)
     result = await flow.async_step_init(user_input=None)
+    assert result["type"] == FlowResultType.MENU
+    assert result["menu_options"] == ["user", "startup"]
+
+
+async def test_options_startup_form_default(hass: HomeAssistant) -> None:
+    """The startup step shows the default stagger when none is stored."""
+    flow, _ = build_options_flow(hass)
+    result = await flow.async_step_startup(user_input=None)
     assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "startup"
+    (key,) = result["data_schema"].schema  # type: ignore[union-attr]
+    assert key.default() == DEFAULT_INITIAL_UPDATE_STAGGER
+
+
+async def test_options_startup_saves_and_preserves_options(
+    hass: HomeAssistant,
+) -> None:
+    """Saving the stagger keeps the stored cloud credentials."""
+    flow, entry = build_options_flow(hass)
+    before = dict(entry.options)
+    result = await flow.async_step_startup(
+        user_input={CONF_INITIAL_UPDATE_STAGGER: 8}
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_INITIAL_UPDATE_STAGGER] == 8.0
+    for key, value in before.items():
+        assert result["data"][key] == value
 
 
 async def test_options_user_no_input(hass: HomeAssistant) -> None:
