@@ -23,14 +23,15 @@ from .const import (
     CONF_DEVICE_ID,
     CONF_DEVICE_NAME,
     CONF_FUNCTIONS,
+    CONF_INITIAL_UPDATE_STAGGER,
     CONF_LOCAL_KEY,
     CONF_PRODUCT_ID,
     CONF_PRODUCT_MODEL,
     CONF_PRODUCT_NAME,
     CONF_STATUS_RANGE,
     CONF_UUID,
+    DEFAULT_INITIAL_UPDATE_STAGGER,
     DOMAIN,
-    INITIAL_UPDATE_STAGGER_SECONDS,
 )
 from .device_registry import async_setup_registry
 from .devices import TuyaBLECoordinator, TuyaBLEData, get_device_product_info
@@ -49,16 +50,17 @@ _LOGGER = logging.getLogger(__name__)
 _STAGGER_KEY = f"{DOMAIN}_initial_update_next_slot"
 
 
-def _claim_initial_update_delay(hass: HomeAssistant) -> float:
+def _claim_initial_update_delay(hass: HomeAssistant, interval: float) -> float:
     """Reserve the next startup slot and return how long to wait for it.
 
-    Slots are INITIAL_UPDATE_STAGGER_SECONDS apart. The first entry gets no delay;
-    each later entry set up in the same burst waits one more interval. Once the
-    burst is over the next slot is in the past, so a lone reload is not delayed.
+    The entry that claims a slot holds the following one back by ``interval``
+    seconds (its own stagger setting). The first entry gets no delay; each later
+    entry set up in the same burst waits for the slots ahead of it. Once the burst
+    is over the next slot is in the past, so a lone reload is not delayed.
     """
     now = hass.loop.time()
     slot = max(now, hass.data.get(_STAGGER_KEY, now))
-    hass.data[_STAGGER_KEY] = slot + INITIAL_UPDATE_STAGGER_SECONDS
+    hass.data[_STAGGER_KEY] = slot + max(0.0, interval)
     return slot - now
 
 
@@ -216,7 +218,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = TuyaBLECoordinator(hass, device)
 
     # Claimed now, synchronously, so slots follow setup order.
-    initial_update_delay = _claim_initial_update_delay(hass)
+    initial_update_delay = _claim_initial_update_delay(
+        hass,
+        float(
+            entry.options.get(
+                CONF_INITIAL_UPDATE_STAGGER, DEFAULT_INITIAL_UPDATE_STAGGER
+            )
+        ),
+    )
 
     async def _async_initial_update() -> None:
         """Request the initial device status without blocking setup."""
