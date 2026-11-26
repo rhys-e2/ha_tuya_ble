@@ -38,9 +38,14 @@ __all__ = [
 
 DOMAIN: Final = "tuya_ble"
 
-# Gap between the initial status requests of different devices at startup, so a
-# large number of config entries does not open BLE connections all at once.
-INITIAL_UPDATE_STAGGER_SECONDS: Final = 5.0
+# Option key (per config entry) for the startup stagger, and its default and bounds.
+# After a device starts its initial status request, the next device set up in the
+# same burst waits this many seconds, so a large number of config entries does not
+# open BLE connections all at once. 0 disables staggering for that device.
+CONF_INITIAL_UPDATE_STAGGER: Final = "initial_update_stagger"
+DEFAULT_INITIAL_UPDATE_STAGGER: Final = 5.0
+MIN_INITIAL_UPDATE_STAGGER: Final = 0.0
+MAX_INITIAL_UPDATE_STAGGER: Final = 60.0
 
 DEVICE_METADATA_UUIDS: Final = "uuids"
 
