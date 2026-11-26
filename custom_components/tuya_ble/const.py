@@ -38,6 +38,10 @@ __all__ = [
 
 DOMAIN: Final = "tuya_ble"
 
+# Gap between the initial status requests of different devices at startup, so a
+# large number of config entries does not open BLE connections all at once.
+INITIAL_UPDATE_STAGGER_SECONDS: Final = 5.0
+
 DEVICE_METADATA_UUIDS: Final = "uuids"
 
 DEVICE_DEF_MANUFACTURER: Final = "tuya"
