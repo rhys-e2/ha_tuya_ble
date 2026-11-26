@@ -36,6 +36,7 @@ from .const import (
     CONF_DEVICE_NAME,
     CONF_ENDPOINT,
     CONF_FUNCTIONS,
+    CONF_INITIAL_UPDATE_STAGGER,
     CONF_LOCAL_KEY,
     CONF_LOCAL_SCHEMA,
     CONF_PRODUCT_ID,
@@ -46,7 +47,10 @@ from .const import (
     CONF_TOKEN_INFO,
     CONF_USER_CODE,
     CONF_UUID,
+    DEFAULT_INITIAL_UPDATE_STAGGER,
     DOMAIN,
+    MAX_INITIAL_UPDATE_STAGGER,
+    MIN_INITIAL_UPDATE_STAGGER,
     TUYA_CLIENT_ID,
     TUYA_RESPONSE_CODE,
     TUYA_RESPONSE_MSG,
@@ -928,8 +932,40 @@ class TuyaBLEOptionsFlow(OptionsFlowWithConfigEntry, _QRCodeLoginMixin):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Delegate to the user step for re-authentication."""
-        return await self.async_step_user(user_input)
+        """Offer re-authentication or the startup settings."""
+        return self.async_show_menu(step_id="init", menu_options=["user", "startup"])
+
+    async def async_step_startup(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure how long this device holds back the next one at startup."""
+        if user_input is not None:
+            # Keep every other option (cloud credentials) untouched.
+            new_data = dict(self.config_entry.options)
+            new_data[CONF_INITIAL_UPDATE_STAGGER] = float(
+                user_input[CONF_INITIAL_UPDATE_STAGGER]
+            )
+            return self.async_create_entry(title="", data=new_data)
+
+        current = self.config_entry.options.get(
+            CONF_INITIAL_UPDATE_STAGGER, DEFAULT_INITIAL_UPDATE_STAGGER
+        )
+        return self.async_show_form(
+            step_id="startup",
+            data_schema=probatio.Schema({
+                probatio.Required(
+                    CONF_INITIAL_UPDATE_STAGGER, default=current
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=MIN_INITIAL_UPDATE_STAGGER,
+                        max=MAX_INITIAL_UPDATE_STAGGER,
+                        step=0.5,
+                        unit_of_measurement="s",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+            }),
+        )
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
