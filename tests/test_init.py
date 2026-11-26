@@ -872,12 +872,33 @@ async def test_async_update_listener_title_unchanged(hass: HomeAssistant) -> Non
 
 
 async def test_initial_update_delays_are_staggered(hass: HomeAssistant) -> None:
-    """Entries set up in one burst get consecutive, evenly spaced startup slots."""
+    """Entries set up in one burst get consecutive slots, spaced by the interval."""
     from custom_components.tuya_ble import _claim_initial_update_delay
-    from custom_components.tuya_ble.const import INITIAL_UPDATE_STAGGER_SECONDS
 
-    delays = [_claim_initial_update_delay(hass) for _ in range(3)]
+    delays = [_claim_initial_update_delay(hass, 5.0) for _ in range(3)]
 
     assert delays[0] == 0
-    assert delays[1] == pytest.approx(INITIAL_UPDATE_STAGGER_SECONDS, abs=0.5)
-    assert delays[2] == pytest.approx(2 * INITIAL_UPDATE_STAGGER_SECONDS, abs=0.5)
+    assert delays[1] == pytest.approx(5.0, abs=0.5)
+    assert delays[2] == pytest.approx(10.0, abs=0.5)
+
+
+async def test_initial_update_zero_interval_disables_stagger(
+    hass: HomeAssistant,
+) -> None:
+    """An interval of 0 never holds the next device back."""
+    from custom_components.tuya_ble import _claim_initial_update_delay
+
+    delays = [_claim_initial_update_delay(hass, 0.0) for _ in range(3)]
+
+    assert all(d == pytest.approx(0, abs=0.5) for d in delays)
+
+
+async def test_initial_update_negative_interval_is_clamped(
+    hass: HomeAssistant,
+) -> None:
+    """A negative interval is treated as 0 rather than rewinding the schedule."""
+    from custom_components.tuya_ble import _claim_initial_update_delay
+
+    _claim_initial_update_delay(hass, -10.0)
+
+    assert _claim_initial_update_delay(hass, 5.0) == pytest.approx(0, abs=0.5)
